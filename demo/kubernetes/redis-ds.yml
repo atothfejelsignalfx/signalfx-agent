@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+    name: redis
+    labels:
+        app: redis
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - image: redis:3.2.8
+        name: redis
+        ports:
+        - containerPort: 6379
+      - image: redis:3.2.8
+        name: redis-benchmark
+        command: [bash, -c, "while true; do redis-benchmark -n $(awk -v min=500 -v max=1000 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'); sleep 5; done"]

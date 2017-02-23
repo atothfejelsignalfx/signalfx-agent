@@ -1,0 +1,21 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: "kafka"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "kafka"
+  template:
+    metadata:
+      name: "kafka"
+      labels:
+        app: "kafka"
+    spec:
+      containers:
+        - name: kafka
+          image: 906383545488.dkr.ecr.us-west-2.amazonaws.com/kafka:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7099

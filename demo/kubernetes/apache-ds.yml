@@ -1,0 +1,25 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+    name: apache
+    labels:
+        app: apache
+spec:
+  selector:
+    matchLabels:
+      app: apache
+  template:
+    metadata:
+      labels:
+        app: apache
+    spec:
+      nodeSelector:
+        run: apache
+      containers:
+      - image: 906383545488.dkr.ecr.us-west-2.amazonaws.com/apache:2.4.18
+        name: apache
+        ports:
+        - containerPort: 80
+      - name: apache-ab
+        image: 906383545488.dkr.ecr.us-west-2.amazonaws.com/apache:2.4.18
+        command: [bash, -c, "while true; do ab -n 500 -c 5 http://localhost/mod_status?auto; sleep 5; done"]

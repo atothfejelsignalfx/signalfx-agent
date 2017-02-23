@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: signalfx-metric-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: signalfx-metric-proxy
+  ports:
+  - port: 20000
+    targetPort: 18080

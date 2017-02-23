@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: signalfx-metric-proxy
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: signalfx-metric-proxy
+    spec:
+      containers:
+      - name: proxy
+        image: quay.io/jcamp/metricproxy:latest
+        env:
+        - name: SFX_API_TOKEN
+          valueFrom:
+              secretKeyRef:
+                  name: signalfx
+                  key: api-token

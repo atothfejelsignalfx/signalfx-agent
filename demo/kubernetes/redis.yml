@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: redis
+  name: redis
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: redis
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - image: redis:3.2.8
+        name: redis
+        ports:
+        - containerPort: 6379
+          name: redis-tcp
+          protocol: TCP
+      - image: redis:3.2.8
+        name: redis-benchmark
+        command: [bash, -c, "while true; do redis-benchmark -n $(awk -v min=5000 -v max=10000 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'); sleep 5; done"]
