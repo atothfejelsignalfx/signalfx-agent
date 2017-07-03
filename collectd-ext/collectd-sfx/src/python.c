@@ -1649,6 +1649,7 @@ static int cpy_reloadable_config(oconfig_item_t *ci) {
         continue;
       }
 
+      const char *init_function_name = "init";
       llentry_t *loadedmodule = llist_search(list_loadedmodules, module_name);
       if (loadedmodule == NULL) {
         DEBUG("importing module: %s", module_name);
@@ -1658,6 +1659,11 @@ static int cpy_reloadable_config(oconfig_item_t *ci) {
           cpy_log_exception("importing module");
           status = 1;
         } else {
+          if (PyObject_HasAttrString(module, init_function_name) == 0) {
+            ERROR("python plugin: module %s does not have an '%s' function. "
+              "Please upgrade plugin to support this.", module_name, init_function_name);
+            status = 1;
+          } else {
             loadedmodule = llentry_create(module_name, module);
             if (loadedmodule == NULL) {
               ERROR("plugin: list_loadedmodules: "
@@ -1668,35 +1674,18 @@ static int cpy_reloadable_config(oconfig_item_t *ci) {
                 INFO("plugin_load: python module \"%s\" successfully loaded.", loadedmodule->key);
                 llist_append(list_loadedmodules, loadedmodule);
             }
+          }
         }
       } else {
-          INFO("plugin_load: python module \"%s\" successfully reloaded." , module_name);
-          module = PyImport_ReloadModule(loadedmodule->value);
-          if (module == NULL) {
-            ERROR("python plugin: Error reimporting module \"%s\".", module_name);
-            cpy_log_exception("importing module");
-            status = 1;
-          } else {
-              llist_remove(list_loadedmodules, loadedmodule);
-              // 'key' is the module_name alloc'ed by the cf_util_get_string call
-              // above
-              free(loadedmodule->key);
-              llentry_destroy(loadedmodule);
-              loadedmodule = llentry_create(module_name, module);
-              if (loadedmodule == NULL) {
-                ERROR("plugin: list_loadedmodules: "
-                      "module failed.");
-                cpy_log_exception("importing module");
-                status = 1;
-              } else {
-                  llist_append(list_loadedmodules, loadedmodule);
-              }
-          }
-      }
-
-      //free(module_name);
-      Py_XDECREF(module);
-
+        PyObject *init_function = PyObject_GetAttrString(loadedmodule->value, init_function_name);
+        PyObject *ret = PyObject_CallFunction(init_function, NULL);
+        if (ret == NULL) {
+          cpy_log_exception("calling module init");
+        } else {
+          Py_DECREF(ret);
+        }
+        Py_DECREF(init_function);
+	  }
     } else if (strcasecmp(item->key, "Module") == 0) {
       char *name = NULL;
       cpy_callback_t *c;
