@@ -8,7 +8,7 @@ import (
 // RunSimpleSocketServer creates and runs a simple UNIX domain socket server
 // that will call handler for each connection and write back whatever that
 // function returns to the client.  Returns a function that can be called to
-// stop the server.
+// stop the server.  Assumes a simple request/response cycle.
 func RunSimpleSocketServer(path string, handler func(net.Conn) string, errs func(error)) (func(), error) {
 	closed := false
 

@@ -2,14 +2,13 @@ package neopy
 
 import (
 	"encoding/json"
+	"net"
 	"sync"
 
-	"github.com/pebbe/zmq4"
 	log "github.com/sirupsen/logrus"
 )
 
-const loggingSocketPath = "ipc:///tmp/signalfx-logs.ipc"
-const loggingTopic = "logs"
+const loggingSocketPath = "/tmp/signalfx-logs.sock"
 
 // LogMessage represents the log message that comes back from python
 type LogMessage struct {
@@ -24,26 +23,14 @@ type LogMessage struct {
 // LoggingQueue wraps the zmq socket used to get log messages back from the
 // python runner.
 type LoggingQueue struct {
-	socket *zmq4.Socket
-	mutex  sync.Mutex
-}
-
-func newLoggingQueue() *LoggingQueue {
-	subSock, err := zmq4.NewSocket(zmq4.SUB)
-	if err != nil {
-		panic("Could not create logging zmq socket: " + err.Error())
-	}
-
-	return &LoggingQueue{
-		socket: subSock,
-	}
+	listener net.Listener
+	mutex    sync.Mutex
 }
 
 func (lq *LoggingQueue) start() error {
-	if err := lq.socket.Bind(lq.socketPath()); err != nil {
-		return err
-	}
-	return lq.socket.SetSubscribe(loggingTopic)
+	var err error
+	lq.listener, err = net.Listen("unixpacket", lq.socketPath())
+	return err
 }
 
 func (lq *LoggingQueue) socketPath() string {
@@ -53,7 +40,7 @@ func (lq *LoggingQueue) socketPath() string {
 func (lq *LoggingQueue) listenForLogMessages() {
 	go func() {
 		for {
-			message, err := lq.socket.RecvMessageBytes(0)
+			message, err := lq.listener.Accept()
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
@@ -62,8 +49,7 @@ func (lq *LoggingQueue) listenForLogMessages() {
 			}
 
 			var msg LogMessage
-			// message[0] is just the topic name
-			err = json.Unmarshal(message[1], &msg)
+			err = json.Unmarshal(message, &msg)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error": err,
