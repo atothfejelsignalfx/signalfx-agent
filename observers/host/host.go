@@ -1,4 +1,4 @@
-// host observer that monitors the current host for active network listeners
+// Package host observer that monitors the current host for active network listeners
 // and reports them as service endpoints
 package host
 
