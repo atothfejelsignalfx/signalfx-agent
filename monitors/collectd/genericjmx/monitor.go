@@ -2,6 +2,7 @@ package genericjmx
 
 import (
 	"github.com/signalfx/neo-agent/monitors"
+	"github.com/signalfx/neo-agent/monitors/types"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -18,7 +19,7 @@ func init() {
 		panic("YAML for GenericJMX MBeans is invalid: " + err.Error())
 	}
 
-	monitors.Register(monitorType, func(id monitors.MonitorID) interface{} {
+	monitors.Register(monitorType, func(id types.MonitorID) interface{} {
 		return Monitor{
 			NewJMXMonitorCore(id, DefaultMBeans, "java"),
 		}

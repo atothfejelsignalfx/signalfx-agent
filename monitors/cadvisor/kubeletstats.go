@@ -19,6 +19,7 @@ import (
 	"github.com/signalfx/neo-agent/core/common/kubelet"
 	"github.com/signalfx/neo-agent/core/config"
 	"github.com/signalfx/neo-agent/monitors"
+	"github.com/signalfx/neo-agent/monitors/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +28,7 @@ const (
 )
 
 func init() {
-	monitors.Register(kubeletStatsType, func(id monitors.MonitorID) interface{} { return &KubeletStatsMonitor{} }, &KubeletStatsConfig{})
+	monitors.Register(kubeletStatsType, func(id types.MonitorID) interface{} { return &KubeletStatsMonitor{} }, &KubeletStatsConfig{})
 }
 
 // KubeletStatsConfig respresents config for the Kubelet stats monitor
@@ -52,7 +53,7 @@ type KubeletStatsMonitor struct {
 func (ks *KubeletStatsMonitor) Configure(conf *KubeletStatsConfig) error {
 	kubeletAPI := conf.KubeletAPI
 	if kubeletAPI.URL == "" {
-		kubeletAPI.URL = fmt.Sprintf("https://%s:10250", conf.Hostname)
+		kubeletAPI.URL = fmt.Sprintf("https://%s:10250", ks.AgentMeta.Hostname)
 	}
 	client, err := kubelet.NewClient(&kubeletAPI)
 	if err != nil {

@@ -7,12 +7,13 @@ import (
 	"github.com/signalfx/neo-agent/core/services"
 	"github.com/signalfx/neo-agent/monitors"
 	"github.com/signalfx/neo-agent/monitors/collectd"
+	"github.com/signalfx/neo-agent/monitors/types"
 )
 
 const monitorType = "collectd/health_checker"
 
 func init() {
-	monitors.Register(monitorType, func(id monitors.MonitorID) interface{} {
+	monitors.Register(monitorType, func(id types.MonitorID) interface{} {
 		return &Monitor{
 			*collectd.NewMonitorCore(id, CollectdTemplate),
 		}

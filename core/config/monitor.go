@@ -1,11 +1,7 @@
 package config
 
 import (
-	"net/url"
 	"reflect"
-
-	"github.com/signalfx/neo-agent/core/config/stores"
-	"github.com/signalfx/neo-agent/core/filters"
 )
 
 // MonitorConfig is used to configure monitor instances.  One instance of
@@ -29,16 +25,7 @@ type MonitorConfig struct {
 	// ValidationError is where a message concerning validation issues can go
 	// so that diagnostics can output it.
 	ValidationError string `yaml:"-"`
-	// The remaining are propagated from the top-level config and cannot be set
-	// by the user directly on the monitor
-	IngestURL                 *url.URL           `yaml:"-"`
-	SignalFxAccessToken       string             `yaml:"-"`
-	Hostname                  string             `yaml:"-"`
-	Filter                    *filters.FilterSet `yaml:"-"`
-	ProcFSPath                string             `yaml:"-"`
-	MetaStore                 *stores.MetaStore  `yaml:"-"`
-	CollectdConf              *CollectdConfig    `yaml:"-"`
-	InternalMetricsSocketPath string             `yaml:"-"`
+	Hostname        string `yaml:"-"`
 }
 
 // Equals tests if two monitor configs are sufficiently equal to each other.
@@ -60,14 +47,14 @@ func (mc *MonitorConfig) HasAutoDiscovery() bool {
 	return mc.DiscoveryRule != ""
 }
 
-// CoreConfig provides a way of getting the MonitorConfig when embedded in a
+// MonitorConfig provides a way of getting the MonitorConfig when embedded in a
 // struct that is referenced through a more generic interface.
-func (mc *MonitorConfig) CoreConfig() *MonitorConfig {
+func (mc *MonitorConfig) MonitorConfigCore() *MonitorConfig {
 	return mc
 }
 
 // MonitorCustomConfig represents monitor-specific configuration that doesn't
 // appear in the MonitorConfig struct.
 type MonitorCustomConfig interface {
-	CoreConfig() *MonitorConfig
+	MonitorConfigCore() *MonitorConfig
 }

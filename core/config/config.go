@@ -142,10 +142,6 @@ func (c *Config) propagateValuesDown(metaStore *stores.MetaStore) {
 	}
 
 	c.Collectd.Hostname = c.Hostname
-	c.Collectd.Filter = filterSet
-	c.Collectd.IngestURL = c.IngestURL
-	c.Collectd.SignalFxAccessToken = c.SignalFxAccessToken
-	c.Collectd.GlobalDimensions = c.GlobalDimensions
 	c.Collectd.IntervalSeconds = utils.FirstNonZero(c.Collectd.IntervalSeconds, c.IntervalSeconds)
 
 	// If the root mount namespace is mounted at ./hostfs we need to tell
@@ -160,16 +156,8 @@ func (c *Config) propagateValuesDown(metaStore *stores.MetaStore) {
 	}
 
 	for i := range c.Monitors {
-		c.Monitors[i].CollectdConf = &c.Collectd
-		c.Monitors[i].IngestURL = ingestURL
-		c.Monitors[i].SignalFxAccessToken = c.SignalFxAccessToken
-		c.Monitors[i].Hostname = c.Hostname
-		c.Monitors[i].Filter = filterSet
-		c.Monitors[i].ProcFSPath = c.ProcFSPath
 		// Top level interval serves as a default
 		c.Monitors[i].IntervalSeconds = utils.FirstNonZero(c.Monitors[i].IntervalSeconds, c.IntervalSeconds)
-		c.Monitors[i].MetaStore = metaStore
-		c.Monitors[i].InternalMetricsSocketPath = c.InternalMetricsSocketPath
 	}
 
 	for i := range c.Observers {
@@ -227,13 +215,9 @@ type CollectdConfig struct {
 	WriteServerIPAddr    string `yaml:"writeServerIPAddr" default:"127.9.8.7"`
 	WriteServerPort      uint16 `yaml:"writeServerPort" default:"14839"`
 	// The following are propagated from the top-level config
-	HostFSPath           string             `yaml:"-"`
-	Hostname             string             `yaml:"-"`
-	Filter               *filters.FilterSet `yaml:"-"`
-	SignalFxAccessToken  string             `yaml:"-"`
-	IngestURL            string             `yaml:"-"`
-	GlobalDimensions     map[string]string  `yaml:"-"`
-	HasGenericJMXMonitor bool               `yaml:"-"`
+	HostFSPath           string `yaml:"-"`
+	Hostname             string `yaml:"-"`
+	HasGenericJMXMonitor bool   `yaml:"-"`
 }
 
 // Validate the collectd specific config

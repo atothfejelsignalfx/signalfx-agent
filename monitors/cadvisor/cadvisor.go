@@ -9,6 +9,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/neo-agent/core/config"
 	"github.com/signalfx/neo-agent/monitors"
+	"github.com/signalfx/neo-agent/monitors/types"
 )
 
 const (
@@ -16,7 +17,7 @@ const (
 )
 
 func init() {
-	monitors.Register(cadvisorType, func(id monitors.MonitorID) interface{} { return &Cadvisor{} }, &CHTTPConfig{})
+	monitors.Register(cadvisorType, func(id types.MonitorID) interface{} { return &Cadvisor{} }, &CHTTPConfig{})
 }
 
 // CHTTPConfig is the monitor-specific config for cAdvisor

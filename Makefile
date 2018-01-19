@@ -56,8 +56,8 @@ run-dev-image:
 		--name signalfx-agent-dev \
 		-v $(PWD)/local-etc:/etc/signalfx \
 		-v /:/agent/hostfs:ro \
-		-v $(PWD):/go/src/github.com/signalfx/neo-agent \
-		-v $(PWD)/collectd:/usr/src/collectd \
+		-v $(PWD):/go/src/github.com/signalfx/neo-agent:cached \
+		-v $(PWD)/collectd:/usr/src/collectd:cached \
 		-v /var/run/docker.sock:/docker.sock \
 		signalfx-agent-dev /bin/bash
 

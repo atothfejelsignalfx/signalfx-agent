@@ -1,14 +1,20 @@
 package monitors
 
 import (
+	"reflect"
+
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/neo-agent/core/config"
+	"github.com/signalfx/neo-agent/core/meta"
 	"github.com/signalfx/neo-agent/core/services"
 	"github.com/signalfx/neo-agent/core/writer"
+	"github.com/signalfx/neo-agent/monitors/collectd"
+	"github.com/signalfx/neo-agent/monitors/types"
 	"github.com/signalfx/neo-agent/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,17 +37,20 @@ type MonitorManager struct {
 	eventChan   chan<- *event.Event
 	dimPropChan chan<- *writer.DimProperties
 
+	agentMeta *meta.AgentMeta
+
 	idGenerator func() string
 }
 
 // NewMonitorManager creates a new instance of the MonitorManager
-func NewMonitorManager() *MonitorManager {
+func NewMonitorManager(agentMeta *meta.AgentMeta) *MonitorManager {
 	return &MonitorManager{
 		monitorConfigs:      make([]config.MonitorCustomConfig, 0),
 		activeMonitors:      make([]*ActiveMonitor, 0),
 		badConfigs:          make([]*config.MonitorConfig, 0),
 		discoveredEndpoints: make(map[services.ID]services.Endpoint),
 		idGenerator:         utils.NewIDGenerator(),
+		agentMeta:           agentMeta,
 	}
 }
 
@@ -52,13 +61,23 @@ func (mm *MonitorManager) Configure(confs []config.MonitorConfig) {
 	mm.lock.Lock()
 	defer mm.lock.Unlock()
 
+	// By configuring collectd with the monitor manager, we absolve the monitor
+	// instances of having to know about collectd config, which makes it easier
+	// to create monitor config from disparate sources such as from observers.
+	if err := collectd.Instance().Configure(mm.agentMeta.CollectdConf); err != nil {
+		log.WithFields(log.Fields{
+			"error":          err,
+			"collectdConfig": spew.Sdump(mm.agentMeta.CollectdConf),
+		}).Error("Could not configure collectd")
+	}
+
 	mm.monitorConfigs = make([]config.MonitorCustomConfig, 0, len(confs))
 
 	requireSoloTrue := anyMarkedSolo(confs)
 
 	// All monitors are marked for deletion at first.  They can be saved and
 	// reused by having a compatible config in the newly provided config
-	mm.markAllMonitorsAsDoomed()
+	mm.markAllRegularMonitorsAsDoomed()
 
 	for i := range confs {
 		conf := &confs[i]
@@ -101,25 +120,23 @@ func (mm *MonitorManager) processConfigForMonitor(conf *config.MonitorConfig) (c
 
 	configMatchedActive := false
 
-	// Go through each actively running monitor marked for deletion and see if it can be
-	// reconfigured with this particular config.  The criteria for being
-	// reconfigurable with this config is if the type and discovery rule match.
-	// Monitors should all be capable of being dynamically reconfigured on the
-	// fly to minimize down time between config changes.
-	// This makes config O(n*m) where n=<number of monitor configs> and
-	// m=<number of active monitors> but given how infrequent config changes
-	// are and how few active monitors there will be for a single agent, this
-	// should be acceptable.
+	// Go through each actively running monitor marked for deletion and see if
+	// it matches this particular config. If a monitor is already configured
+	// with this same configuration, it will be saved and left untouched. This
+	// makes config O(n*m) where n=<number of monitor configs> and m=<number of
+	// active monitors> but given how infrequent config changes are and how few
+	// active monitors there will be for a single agent, this should be
+	// acceptable.
 	for i := range mm.activeMonitors {
 		am := mm.activeMonitors[i]
 		if am.doomed {
-			coreConfig := am.config.CoreConfig()
-			monitorsCompatible := coreConfig.Type == conf.Type && coreConfig.DiscoveryRule == conf.DiscoveryRule
-			if monitorsCompatible {
+			if reflect.DeepEqual(am.config, monConfig) {
+				log.WithFields(log.Fields{
+					"config": spew.Sdump(am.config),
+					"id":     am.id,
+				}).Debug("Saving monitor instance")
+
 				configMatchedActive = true
-				if err := am.configureMonitor(monConfig); err != nil {
-					return nil, err
-				}
 				am.doomed = false
 			}
 		}
@@ -179,9 +196,12 @@ func (mm *MonitorManager) SetDimPropChannel(dimPropChan chan<- *writer.DimProper
 	}
 }
 
-func (mm *MonitorManager) markAllMonitorsAsDoomed() {
+// Marks all of the monitors without self-configured endpoints as doomed.
+func (mm *MonitorManager) markAllRegularMonitorsAsDoomed() {
 	for i := range mm.activeMonitors {
-		mm.activeMonitors[i].doomed = true
+		if !mm.activeMonitors[i].HasSelfConfiguredEndpoint() {
+			mm.activeMonitors[i].doomed = true
+		}
 	}
 }
 
@@ -193,8 +213,8 @@ func (mm *MonitorManager) deleteDoomedMonitors() {
 		if am.doomed {
 			log.WithFields(log.Fields{
 				"endpoint":      am.endpoint,
-				"monitorType":   am.config.CoreConfig().Type,
-				"discoveryRule": am.config.CoreConfig().DiscoveryRule,
+				"monitorType":   am.config.MonitorConfigCore().Type,
+				"discoveryRule": am.config.MonitorConfigCore().DiscoveryRule,
 			}).Debug("Shutting down doomed monitor")
 
 			am.Shutdown()
@@ -208,9 +228,15 @@ func (mm *MonitorManager) deleteDoomedMonitors() {
 
 func (mm *MonitorManager) makeMonitorsForMatchingEndpoints(conf config.MonitorCustomConfig) {
 	for id, endpoint := range mm.discoveredEndpoints {
+		// Self configured endpoints are monitored immediately upon being
+		// created and never need to be matched against discovery rules.
+		if endpoint.Core().IsSelfConfigured() {
+			continue
+		}
+
 		log.WithFields(log.Fields{
-			"monitorType":   conf.CoreConfig().Type,
-			"discoveryRule": conf.CoreConfig().DiscoveryRule,
+			"monitorType":   conf.MonitorConfigCore().Type,
+			"discoveryRule": conf.MonitorConfigCore().DiscoveryRule,
 			"endpoint":      endpoint,
 		}).Debug("Trying to find config that matches discovered endpoint")
 
@@ -223,12 +249,12 @@ func (mm *MonitorManager) makeMonitorsForMatchingEndpoints(conf config.MonitorCu
 				log.WithFields(log.Fields{
 					"error":       err,
 					"endpointID":  endpoint.Core().ID,
-					"monitorType": conf.CoreConfig().Type,
+					"monitorType": conf.MonitorConfigCore().Type,
 				}).Error("Error monitoring endpoint that matched rule")
 			} else {
 				log.WithFields(log.Fields{
 					"endpointID":  endpoint.Core().ID,
-					"monitorType": conf.CoreConfig().Type,
+					"monitorType": conf.MonitorConfigCore().Type,
 				}).Info("Now monitoring discovered endpoint")
 			}
 		}
@@ -237,7 +263,7 @@ func (mm *MonitorManager) makeMonitorsForMatchingEndpoints(conf config.MonitorCu
 
 func (mm *MonitorManager) isEndpointIDMonitoredByConfig(conf config.MonitorCustomConfig, id services.ID) bool {
 	for _, am := range mm.activeMonitors {
-		if conf.CoreConfig().Equals(am.config.CoreConfig()) {
+		if conf.MonitorConfigCore().Equals(am.config.MonitorConfigCore()) {
 			return true
 		}
 	}
@@ -246,7 +272,7 @@ func (mm *MonitorManager) isEndpointIDMonitoredByConfig(conf config.MonitorCusto
 
 // Returns true is the service did match a rule in this monitor config
 func (mm *MonitorManager) monitorEndpointIfRuleMatches(config config.MonitorCustomConfig, endpoint services.Endpoint) (bool, error) {
-	if config.CoreConfig().DiscoveryRule == "" || !services.DoesServiceMatchRule(endpoint, config.CoreConfig().DiscoveryRule) {
+	if config.MonitorConfigCore().DiscoveryRule == "" || !services.DoesServiceMatchRule(endpoint, config.MonitorConfigCore().DiscoveryRule) {
 		return false, nil
 	}
 
@@ -266,10 +292,46 @@ func (mm *MonitorManager) EndpointAdded(endpoint services.Endpoint) {
 	ensureProxyingDisabledForService(endpoint)
 	mm.discoveredEndpoints[endpoint.Core().ID] = endpoint
 
-	watching := false
+	// If the endpoint has a monitor type specified, then it is expected to
+	// have all of its configuration already set in the endpoint and discovery
+	// rules will be ignored.
+	if endpoint.Core().IsSelfConfigured() {
+		mm.monitorSelfConfiguredEndpoint(endpoint)
+		return
+	}
+
+	mm.findConfigForMonitorAndRun(endpoint)
+}
+
+func (mm *MonitorManager) monitorSelfConfiguredEndpoint(endpoint services.Endpoint) {
+	monitorType := endpoint.Core().MonitorType
+	conf := &config.MonitorConfig{
+		Type: monitorType,
+	}
+
+	monConfig, err := getCustomConfigForMonitor(conf)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error":       err,
+			"monitorType": monitorType,
+		}).Error("Could not create monitor config for self-configured endpoint")
+	}
+
+	err = mm.createAndConfigureNewMonitor(monConfig, endpoint)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error":    err,
+			"endpoint": endpoint,
+		}).Error("Could not create monitor for self-configured endpoint")
+	}
+}
+
+func (mm *MonitorManager) findConfigForMonitorAndRun(endpoint services.Endpoint) {
+	monitoring := false
+
 	for _, config := range mm.monitorConfigs {
 		matched, err := mm.monitorEndpointIfRuleMatches(config, endpoint)
-		watching = matched || watching
+		monitoring = matched || monitoring
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error":    err,
@@ -279,7 +341,7 @@ func (mm *MonitorManager) EndpointAdded(endpoint services.Endpoint) {
 		}
 	}
 
-	if !watching {
+	if !monitoring {
 		log.WithFields(log.Fields{
 			"endpoint": endpoint,
 		}).Debug("Endpoint added that doesn't match any discovery rules")
@@ -288,17 +350,18 @@ func (mm *MonitorManager) EndpointAdded(endpoint services.Endpoint) {
 
 // endpoint may be nil for static monitors
 func (mm *MonitorManager) createAndConfigureNewMonitor(config config.MonitorCustomConfig, endpoint services.Endpoint) error {
-	id := MonitorID(mm.idGenerator())
+	id := types.MonitorID(mm.idGenerator())
 
-	instance := newMonitor(config.CoreConfig().Type, id)
+	instance := newMonitor(config.MonitorConfigCore().Type, id)
 	if instance == nil {
-		return errors.Errorf("Could not create new monitor of type %s", config.CoreConfig().Type)
+		return errors.Errorf("Could not create new monitor of type %s", config.MonitorConfigCore().Type)
 	}
 
 	am := &ActiveMonitor{
-		id:       id,
-		instance: instance,
-		endpoint: endpoint,
+		id:        id,
+		instance:  instance,
+		endpoint:  endpoint,
+		agentMeta: mm.agentMeta,
 	}
 
 	am.injectDatapointChannelIfNeeded(mm.dpChan)
@@ -311,8 +374,8 @@ func (mm *MonitorManager) createAndConfigureNewMonitor(config config.MonitorCust
 	mm.activeMonitors = append(mm.activeMonitors, am)
 
 	log.WithFields(log.Fields{
-		"monitorType":   config.CoreConfig().Type,
-		"discoveryRule": config.CoreConfig().DiscoveryRule,
+		"monitorType":   config.MonitorConfigCore().Type,
+		"discoveryRule": config.MonitorConfigCore().DiscoveryRule,
 	}).Debug("Creating new monitor")
 
 	return nil

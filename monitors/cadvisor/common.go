@@ -9,6 +9,7 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/neo-agent/core/config"
+	"github.com/signalfx/neo-agent/core/meta"
 	"github.com/signalfx/neo-agent/monitors/cadvisor/converter"
 	"github.com/signalfx/neo-agent/utils"
 )
@@ -32,6 +33,8 @@ type Monitor struct {
 	excludedImages  []*regexp.Regexp
 	excludedLabels  [][]*regexp.Regexp
 	excludedMetrics map[string]bool
+
+	AgentMeta *meta.AgentMeta
 }
 
 func (m *Monitor) getLabelFilter(labels [][]string) [][]*regexp.Regexp {
@@ -117,7 +120,7 @@ func (m *Monitor) Configure(conf *Config, monConfig *config.MonitorConfig, dpCha
 	m.excludedLabels = m.getLabelFilter(conf.ExcludedLabels)
 	m.excludedMetrics = m.getMetricFilter(conf.ExcludedMetrics)
 
-	collector := converter.NewCadvisorCollector(statProvider, dpChan, monConfig.Hostname, monConfig.ExtraDimensions, m.excludedImages, m.excludedNames, m.excludedLabels, m.excludedMetrics)
+	collector := converter.NewCadvisorCollector(statProvider, dpChan, m.AgentMeta.Hostname, monConfig.ExtraDimensions, m.excludedImages, m.excludedNames, m.excludedLabels, m.excludedMetrics)
 
 	m.stop, m.stopped = monitorNode(monConfig.IntervalSeconds, collector)
 

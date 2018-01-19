@@ -3,6 +3,7 @@ package kafka
 import (
 	"github.com/signalfx/neo-agent/monitors"
 	"github.com/signalfx/neo-agent/monitors/collectd/genericjmx"
+	"github.com/signalfx/neo-agent/monitors/types"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -23,7 +24,7 @@ func init() {
 	}
 	defaultMBeans = defaultMBeans.MergeWith(genericjmx.DefaultMBeans)
 
-	monitors.Register(monitorType, func(id monitors.MonitorID) interface{} {
+	monitors.Register(monitorType, func(id types.MonitorID) interface{} {
 		return Monitor{
 			genericjmx.NewJMXMonitorCore(id, defaultMBeans, serviceName),
 		}

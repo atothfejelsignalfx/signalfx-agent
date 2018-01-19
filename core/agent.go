@@ -10,6 +10,7 @@ import (
 
 	"github.com/signalfx/neo-agent/core/config"
 	"github.com/signalfx/neo-agent/core/config/stores"
+	"github.com/signalfx/neo-agent/core/meta"
 	"github.com/signalfx/neo-agent/core/services"
 	"github.com/signalfx/neo-agent/core/writer"
 	"github.com/signalfx/neo-agent/monitors"
@@ -21,6 +22,7 @@ type Agent struct {
 	observers  *observers.ObserverManager
 	monitors   *monitors.MonitorManager
 	writer     *writer.SignalFxWriter
+	meta       *meta.AgentMeta
 	lastConfig *config.Config
 
 	diagnosticSocketStop      func()
@@ -40,7 +42,8 @@ func NewAgent() *Agent {
 	}
 
 	agent.writer = writer.New()
-	agent.monitors = monitors.NewMonitorManager()
+	agent.meta = &meta.AgentMeta{}
+	agent.monitors = monitors.NewMonitorManager(agent.meta)
 
 	return &agent
 }
@@ -61,6 +64,11 @@ func (a *Agent) configure(conf *config.Config) {
 		log.Error("Could not configure SignalFx datapoint writer, unable to start up")
 		os.Exit(4)
 	}
+
+	a.meta.InternalMetricsSocketPath = conf.InternalMetricsSocketPath
+	a.meta.Hostname = conf.Hostname
+	a.meta.CollectdConf = &conf.Collectd
+	a.meta.ProcFSPath = conf.ProcFSPath
 
 	a.monitors.SetDPChannel(a.writer.DPChannel())
 	a.monitors.SetEventChannel(a.writer.EventChannel())

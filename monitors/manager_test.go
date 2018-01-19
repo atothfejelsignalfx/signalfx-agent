@@ -1,13 +1,15 @@
 package monitors
 
 import (
+	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/signalfx/neo-agent/core/config"
+	"github.com/signalfx/neo-agent/core/meta"
 	"github.com/signalfx/neo-agent/core/services"
+	"github.com/signalfx/neo-agent/monitors/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,14 +32,14 @@ func newService(imageName string, publicPort int) services.Endpoint {
 
 var _ = Describe("Monitor Manager", func() {
 	var manager *MonitorManager
-	var getMonitors func() map[MonitorID]MockMonitor
+	var getMonitors func() map[types.MonitorID]MockMonitor
 
 	BeforeEach(func() {
 		DeregisterAll()
 
 		getMonitors = RegisterFakeMonitors()
 
-		manager = NewMonitorManager()
+		manager = NewMonitorManager(&meta.AgentMeta{})
 	})
 
 	It("Starts up static monitors immediately", func() {
@@ -51,7 +53,6 @@ var _ = Describe("Monitor Manager", func() {
 			},
 		})
 
-		spew.Dump(getMonitors())
 		Expect(len(getMonitors())).To(Equal(1))
 		for _, mon := range getMonitors() {
 			Expect(mon.Type()).To(Equal("static1"))
@@ -289,8 +290,6 @@ var _ = Describe("Monitor Manager", func() {
 		})
 
 		mons = findMonitorsByType(getMonitors(), "dynamic1")
-		spew.Dump(mons)
-		spew.Dump(getMonitors())
 		Expect(len(mons)).To(Equal(1))
 
 		mons = findMonitorsByType(getMonitors(), "dynamic2")
@@ -349,4 +348,125 @@ var _ = Describe("Monitor Manager", func() {
 		Expect(len(mons)).To(Equal(1))
 	})
 
+	It("Monitors self-configured endpoints", func() {
+		manager.Configure([]config.MonitorConfig{
+			config.MonitorConfig{
+				Type: "static1",
+			},
+		})
+
+		endpoint := newService("my-service", 5000)
+		endpoint.Core().MonitorType = "dynamic1"
+		endpoint.Core().Configuration = map[string]interface{}{
+			"myVar": "testing",
+		}
+
+		manager.EndpointAdded(endpoint)
+
+		mons := findMonitorsByType(getMonitors(), "dynamic1")
+		Expect(len(mons)).To(Equal(1))
+		Expect(mons[0].MyVar()).To(Equal("testing"))
+	})
+
+	It("Does not double monitor self-configured endpoint", func() {
+		manager.Configure([]config.MonitorConfig{
+			config.MonitorConfig{
+				Type: "static1",
+			},
+		})
+
+		endpoint := newService("my-service", 5000)
+		endpoint.Core().MonitorType = "dynamic1"
+		endpoint.Core().Configuration = map[string]interface{}{
+			"myVar": "testing",
+		}
+
+		manager.EndpointAdded(endpoint)
+
+		manager.Configure([]config.MonitorConfig{
+			config.MonitorConfig{
+				Type: "static1",
+			},
+			config.MonitorConfig{
+				Type:          "dynamic1",
+				DiscoveryRule: `containerImage =~ "my-service"`,
+			},
+		})
+
+		mons := findMonitorsByType(getMonitors(), "dynamic1")
+		Expect(len(mons)).To(Equal(1))
+		Expect(mons[0].MyVar()).To(Equal("testing"))
+
+		manager.EndpointRemoved(endpoint)
+
+		endpoint.Core().MonitorType = ""
+		manager.EndpointAdded(endpoint)
+
+		mons = findMonitorsByType(getMonitors(), "dynamic1")
+		Expect(len(mons)).To(Equal(1))
+	})
+
+	It("Does not stop monitoring self-configured endpoint on reconfig", func() {
+		manager.Configure([]config.MonitorConfig{
+			config.MonitorConfig{
+				Type: "static1",
+			},
+		})
+
+		endpoint := newService("my-service", 5000)
+		endpoint.Core().MonitorType = "dynamic1"
+		endpoint.Core().Configuration = map[string]interface{}{
+			"myVar": "testing",
+		}
+
+		manager.EndpointAdded(endpoint)
+
+		manager.Configure([]config.MonitorConfig{
+			config.MonitorConfig{
+				Type: "static1",
+			},
+			config.MonitorConfig{
+				Type:          "dynamic2",
+				DiscoveryRule: `containerImage =~ "not-my-service"`,
+			},
+		})
+
+		mons := findMonitorsByType(getMonitors(), "dynamic1")
+		Expect(len(mons)).To(Equal(1))
+		Expect(mons[0].MyVar()).To(Equal("testing"))
+	})
+
+	It("Stops monitoring self-configured endpoint when removed", func() {
+		manager.Configure([]config.MonitorConfig{
+			config.MonitorConfig{
+				Type: "static1",
+			},
+		})
+
+		endpoint := newService("my-service", 5000)
+		endpoint.Core().MonitorType = "dynamic1"
+		endpoint.Core().Configuration = map[string]interface{}{
+			"myVar": "testing",
+		}
+
+		manager.EndpointAdded(endpoint)
+
+		staticMons := findMonitorsByType(getMonitors(), "static1")
+		Expect(len(staticMons)).To(Equal(1))
+		mons := findMonitorsByType(getMonitors(), "dynamic1")
+		Expect(len(mons)).To(Equal(1))
+
+		manager.EndpointRemoved(endpoint)
+
+		staticMons = findMonitorsByType(getMonitors(), "static1")
+		Expect(len(staticMons)).To(Equal(1))
+
+		mons = findMonitorsByType(getMonitors(), "dynamic1")
+		Expect(len(mons)).To(Equal(0))
+	})
 })
+
+func TestMonitors(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Monitor Suite")
+}

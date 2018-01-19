@@ -13,13 +13,9 @@ LoadPlugin "python"
     {{with .HTTPTimeout -}}
     HTTPTimeout {{.}}
     {{- end}}
-    {{with .Password -}}
-    Password "{{.}}"
-    {{- end}}
     Port "{{.Port}}"
-    {{with .Username -}}
-    Username "{{.}}"
-    {{- end}}
+    Username "{{.Username}}"
+    Password "{{.Password}}"
     {{with .VerbosityLevel -}}
     VerbosityLevel "{{.}}"
     {{- end}}

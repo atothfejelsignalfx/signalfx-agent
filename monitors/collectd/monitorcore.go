@@ -12,8 +12,8 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/neo-agent/core/config"
-	"github.com/signalfx/neo-agent/monitors"
 	"github.com/signalfx/neo-agent/monitors/collectd/templating"
+	"github.com/signalfx/neo-agent/monitors/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +27,7 @@ type MonitorCore struct {
 	configFilename string
 	config         config.MonitorCustomConfig
 	isRunning      bool
-	monitorID      monitors.MonitorID
+	monitorID      types.MonitorID
 	lock           sync.Mutex
 	DPs            chan<- *datapoint.Datapoint
 	Events         chan<- *event.Event
@@ -36,7 +36,7 @@ type MonitorCore struct {
 
 // NewMonitorCore creates a new initialized but unconfigured MonitorCore with
 // the given template.
-func NewMonitorCore(id monitors.MonitorID, template *template.Template) *MonitorCore {
+func NewMonitorCore(id types.MonitorID, template *template.Template) *MonitorCore {
 	return &MonitorCore{
 		Template:  template,
 		isRunning: false,
@@ -70,7 +70,7 @@ func (bm *MonitorCore) SetConfiguration(conf config.MonitorCustomConfig) error {
 
 	bm.config = conf
 
-	return Instance().ConfigureFromMonitor(bm.monitorID, conf.CoreConfig().CollectdConf, bm.DPs, bm.Events, bm.UsesGenericJMX)
+	return Instance().ConfigureFromMonitor(bm.monitorID, bm.DPs, bm.Events, bm.UsesGenericJMX)
 }
 
 // WriteConfigForPluginAndRestart will render the config template to the

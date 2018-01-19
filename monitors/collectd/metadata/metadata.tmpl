@@ -11,8 +11,8 @@ TypesDB "{{Globals.PluginRoot}}/signalfx/types.db.plugin"
     Interval {{.}}
   {{- end}}
     Notifications true
-    URL "{{.CollectdConf.WriteServerURL}}"
-    Token "{{.SignalFxAccessToken}}"
+    URL "{{.WriteServerURL}}"
+    Token "unnecessary"
     NotifyLevel "OKAY"
     ProcPath "{{ .ProcFSPath }}"
     EtcPath "./hostfs/etc"

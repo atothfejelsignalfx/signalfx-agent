@@ -15,9 +15,9 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/neo-agent/core/config"
-	"github.com/signalfx/neo-agent/monitors"
 	"github.com/signalfx/neo-agent/monitors/collectd/templating"
 	"github.com/signalfx/neo-agent/monitors/collectd/write"
+	"github.com/signalfx/neo-agent/monitors/types"
 	"github.com/signalfx/neo-agent/utils"
 )
 
@@ -48,8 +48,8 @@ const (
 type Manager struct {
 	configMutex     sync.Mutex
 	conf            *config.CollectdConfig
-	activeMonitors  map[monitors.MonitorID]bool
-	genericJMXUsers map[monitors.MonitorID]bool
+	activeMonitors  map[types.MonitorID]bool
+	genericJMXUsers map[types.MonitorID]bool
 	dpChan          chan<- *datapoint.Datapoint
 	eventChan       chan<- *event.Event
 	active          bool
@@ -60,8 +60,8 @@ type Manager struct {
 }
 
 var collectdSingleton = &Manager{
-	activeMonitors:  make(map[monitors.MonitorID]bool),
-	genericJMXUsers: make(map[monitors.MonitorID]bool),
+	activeMonitors:  make(map[types.MonitorID]bool),
+	genericJMXUsers: make(map[types.MonitorID]bool),
 	stop:            make(chan struct{}),
 	requestRestart:  make(chan struct{}),
 }
@@ -77,19 +77,25 @@ func Instance() *Manager {
 	return collectdSingleton
 }
 
+func (cm *Manager) Configure(conf *config.CollectdConfig) error {
+	cm.configMutex.Lock()
+	defer cm.configMutex.Unlock()
+
+	cm.conf = conf
+	cm.requestRestart <- struct{}{}
+
+	return nil
+}
+
 // ConfigureFromMonitor configures collectd, renders the collectd.conf file,
 // and queues a (re)start.  Individual collectd-based monitors write their own
 // config files and should queue restarts when they have rendered their own
 // config files.  The monitorID is passed in so that we can keep track of what
 // monitors are actively using collectd.  When a monitor is done (i.e.
 // shutdown) it should call MonitorDidShutdown.
-func (cm *Manager) ConfigureFromMonitor(monitorID monitors.MonitorID, conf *config.CollectdConfig,
+func (cm *Manager) ConfigureFromMonitor(monitorID types.MonitorID,
 	dpChan chan<- *datapoint.Datapoint, eventChan chan<- *event.Event, usesGenericJMX bool) error {
 
-	cm.configMutex.Lock()
-	defer cm.configMutex.Unlock()
-
-	cm.conf = conf
 	cm.dpChan = dpChan
 	cm.eventChan = eventChan
 
@@ -109,7 +115,7 @@ func (cm *Manager) ConfigureFromMonitor(monitorID monitors.MonitorID, conf *conf
 
 // MonitorDidShutdown should be called by any monitor that uses collectd when
 // it is shutdown.
-func (cm *Manager) MonitorDidShutdown(monitorID monitors.MonitorID) {
+func (cm *Manager) MonitorDidShutdown(monitorID types.MonitorID) {
 	cm.configMutex.Lock()
 	defer cm.configMutex.Unlock()
 

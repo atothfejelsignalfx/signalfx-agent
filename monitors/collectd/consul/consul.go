@@ -6,12 +6,13 @@ import (
 	"github.com/signalfx/neo-agent/core/config"
 	"github.com/signalfx/neo-agent/monitors"
 	"github.com/signalfx/neo-agent/monitors/collectd"
+	"github.com/signalfx/neo-agent/monitors/types"
 )
 
 const monitorType = "collectd/consul"
 
 func init() {
-	monitors.Register(monitorType, func(id monitors.MonitorID) interface{} {
+	monitors.Register(monitorType, func(id types.MonitorID) interface{} {
 		return &Monitor{
 			*collectd.NewMonitorCore(id, CollectdTemplate),
 		}
@@ -26,12 +27,13 @@ type Config struct {
 	Port uint16 `yaml:"port"`
 	Name string `yaml:"name"`
 
-	ACLToken          *string `yaml:"aclToken"`
-	UseHTTPS          bool    `yaml:"useHTTPS" default:"false"`
-	EnhancedMetrics   bool    `yaml:"enhancedMetrics" default:"false"`
-	CACertificate     *string `yaml:"caCertificate"`
-	ClientCertificate *string `yaml:"clientCertificate"`
-	ClientKey         *string `yaml:"clientKey"`
+	ACLToken            string `yaml:"aclToken"`
+	UseHTTPS            bool   `yaml:"useHTTPS" default:"false"`
+	EnhancedMetrics     bool   `yaml:"enhancedMetrics" default:"false"`
+	CACertificate       string `yaml:"caCertificate"`
+	ClientCertificate   string `yaml:"clientCertificate"`
+	ClientKey           string `yaml:"clientKey"`
+	SignalFxAccessToken string `yaml:"signalFxAccessToken"`
 }
 
 // Monitor is the main type that represents the monitor

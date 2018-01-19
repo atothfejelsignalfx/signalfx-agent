@@ -47,14 +47,14 @@ func (mm *MonitorManager) DiagnosticText() string {
 			serviceText := serviceToDiagnosticText(am.endpoint, true)
 			serviceStats = fmt.Sprintf(
 				"Discovery Rule: %s\nService:\n%s",
-				am.config.CoreConfig().DiscoveryRule, serviceText)
+				am.config.MonitorConfigCore().DiscoveryRule, serviceText)
 		}
 		activeMonText += fmt.Sprintf(
 			"%2d. %s\n"+
 				"    Reporting Interval (seconds): %d\n"+
 				"%s\n",
-			i+1, am.config.CoreConfig().Type,
-			am.config.CoreConfig().IntervalSeconds,
+			i+1, am.config.MonitorConfigCore().Type,
+			am.config.MonitorConfigCore().IntervalSeconds,
 			utils.IndentLines(serviceStats, 4))
 		i++
 	}
