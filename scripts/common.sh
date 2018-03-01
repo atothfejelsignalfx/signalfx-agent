@@ -1,38 +1,31 @@
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-make_go_package_tar() {
-  GO_PACKAGES=(
-    core
-    monitors
-    observers
-    utils
-  )
-
-  # A hack to simplify Dockerfile since Dockerfile doesn't support copying
-  # multiple directories without flattening them out
-  (cd $SCRIPT_DIR/.. && tar -cf $SCRIPT_DIR/go_packages.tar main.go Makefile scripts/{make-templates,collectd-template-to-go} ${GO_PACKAGES[@]})
-}
+MY_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 extra_cflags_build_arg() {
   # If this isn't true then let build use default
-  if [[ $DEBUG == 'true' ]]
+  if [[ ${DEBUG-} == 'true' ]]
   then
     echo "--build-arg extra_cflags='-g -O0'"
   fi
 }
 
 do_docker_build() {
-  local tag=$1
-  local dockerfile=$2
+  local image_name=$1
+  local image_tag=$2
+  local target_stage=$3
+  local agent_version=${4:-$image_tag}
 
-  make_go_package_tar
+  cache_flags=
+  if [[ ${PULL_CACHE-} == "yes" ]]; then
+    cache_flags=$($MY_SCRIPT_DIR/docker-cache-from $target_stage)
+  fi
 
   docker build \
-    -t $tag \
-    -f $dockerfile \
-    --label agent.version=$($SCRIPT_DIR/../VERSIONS agent_version) \
-    --label collectd.version=$($SCRIPT_DIR/../VERSIONS collectd_version) \
-    --build-arg DEBUG=$DEBUG \
+    -t $image_name:$image_tag \
+    -f $MY_SCRIPT_DIR/../Dockerfile \
+    --build-arg agent_version=${agent_version} \
+    --target $target_stage \
+    --label agent.version=${agent_version} \
     $(extra_cflags_build_arg) \
-    $SCRIPT_DIR/.. 
+    $cache_flags \
+    $MY_SCRIPT_DIR/.. 
 }

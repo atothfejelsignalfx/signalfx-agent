@@ -1,8 +1,12 @@
 .git/**
 .glide/**
 .build/**
-signalfx-agent
+signalfx-agent*
 vendor/**
 tmp/**
 local-etc/**
 build/**
+internal/monitors/**/template.go
+internal/monitors/collectd/collectd.conf.go
+packaging/*/output
+tests/**/__pycache__

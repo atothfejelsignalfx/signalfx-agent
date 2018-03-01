@@ -1,0 +1,17 @@
+<LoadPlugin "mysql">
+  Interval {{.IntervalSeconds}}
+</LoadPlugin>
+<Plugin mysql>
+  {{range $db := .Databases}}
+  <Database "{{$.Name}}_{{$db.Name}}[monitorID={{$.MonitorID}}]">
+    ReportHost {{$.ReportHost}}
+    Host "{{$.Host}}"
+    Port {{$.Port}}
+    Database "{{$db.Name}}"
+    User "{{$.Username}}"
+    {{with $.Password -}}
+    Password "{{.}}"
+    {{- end}}
+  </Database>
+  {{end}}
+</Plugin>
