@@ -10,6 +10,20 @@ will scale to large number of containers much better.
 See https://github.com/signalfx/docker-collectd-plugin.
 
 
+Sample YAML configuration:
+
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
+
 Monitor Type: `collectd/docker`
 
 [Monitor Source Code](https://github.com/signalfx/signalfx-agent/tree/master/internal/monitors/collectd/docker)
