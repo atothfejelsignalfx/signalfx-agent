@@ -6,6 +6,19 @@
 that hits an endpoint and checks if the configured JSON value is returned in
 the response body.
 
+Sample YAML configuration:
+
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
 
 Monitor Type: `collectd/health-checker`
 
