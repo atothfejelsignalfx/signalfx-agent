@@ -7,6 +7,19 @@ subsystem of the kernel using the [collectd vmem
 plugin](https://collectd.org/wiki/index.php/Plugin:vmem).  There is no
 configuration available for this plugin.
 
+Sample YAML configuration:
+
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
 
 Monitor Type: `collectd/vmem`
 
