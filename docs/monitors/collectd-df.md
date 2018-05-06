@@ -4,6 +4,20 @@
 
  Tracks free disk space on the host.
 
+Sample YAML configuration:
+
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
+
 
 Monitor Type: `collectd/df`
 
