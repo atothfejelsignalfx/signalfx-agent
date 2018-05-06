@@ -12,7 +12,20 @@ true.
 You can see the types of events happening in your cluster with `kubectl get
 events -o yaml --all-namespaces`.
 
+Sample YAML configuration:
 
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
+   
 Monitor Type: `kubernetes-events`
 
 [Monitor Source Code](https://github.com/signalfx/signalfx-agent/tree/master/internal/monitors/kubernetes/events)
