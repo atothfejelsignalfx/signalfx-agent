@@ -23,6 +23,20 @@ This monitor is similar to
 sends many of the same metrics, but in a way that is less verbose and better
 fitted for the SignalFx backend.
 
+Sample YAML configuration:
+
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
+
 
 Monitor Type: `kubernetes-cluster`
 
