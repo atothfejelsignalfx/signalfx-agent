@@ -43,6 +43,19 @@ the pod spec, which is the `name` variable in discovery rules for the
 
 Filtering can be very useful here since exporters tend to be fairly verbose.
 
+Sample YAML configuration:
+
+monitors:
+ - type: collectd/mysql
+   host: localhost
+   port: 3306
+   databases:
+     - name: dbname
+     - name: securedb
+       username: admin
+       password: s3cr3t
+   username: dbuser
+   password: passwd
 
 Monitor Type: `prometheus-exporter`
 
